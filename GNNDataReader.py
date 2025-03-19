@@ -1,127 +1,60 @@
 import torch
 from torch_geometric.data import Data
 import os
-
-# Define a mapping for actions to numerical labels
-action_mapping = {'North': 0, 'South': 1, 'East': 2, 'West': 3}
-
-# Function to process a single file and extract data
-def process_data(data_line):
-
-    # Example line: (0, (8, 2), ['.', '.', '%', '.'], [(4, 12), (4, 13), (16, 11)], ...)
-    elements = data_line  # Convert string to tuple
-    agentIndex, currDronePos, objectsAround, otherAgentPositions, wallCorners, battery, fire, food, score, action, nextPos = elements
-
-    # Convert position to numerical features
-    x_pos, y_pos = currDronePos
-    obj_enc = [1 if obj == '%' else 0 for obj in objectsAround]  # Example encoding walls (modify as needed)
-
-    # Encode other agents' positions (distance-based encoding)
-    agent_distances = [abs(x_pos - ax) + abs(y_pos - ay) for ax, ay in otherAgentPositions]
-
-    # Encode labels (action)
-    action_label = action_mapping[action]
-
-    # Combine node features
-    node_features = torch.tensor([x_pos, y_pos, *obj_enc, *agent_distances, battery, fire, *food, score], dtype=torch.float)
-
-    return node_features, action_label
-
-def load_txt(file_path):
-    with open(file_path, 'r') as f:
-        allParsed = []
-        for line in f:  # Read line by line
-            parsedList=[]
-            line = line.strip()
-            firstIdx=line.find('(')
-            if line.endswith(")"):  # Check if line starts and ends with ()
-                line = line[firstIdx+1:-1]  # Remove first '(' and last ')'
-                data = ast.literal_eval(f"({line})")
-                # for item in data:
-                #     parsedList.append(item)
-                allParsed.append(data)
-        return allParsed
-
 import glob
-# Load all files
-data_folder = "/home/salmansaleh/PycharmProjects/GraphNeuralNetwork/logs/"
-# Recursively get all .pkl files in subdirectories
-files = glob.glob(os.path.join(data_folder, "**", "1_*.txt"), recursive=True)
-files = files[:100]
-print('Total Valid Files-', len(files))
-
-
-
-
-# Load all data samples
-all_missions = [load_txt(file) for file in files]
-
-print(f"Loaded {len(all_missions)} samples from multiple folders.")
-print("Example sample:", all_missions[0])  # Check first sample
-nodes = []
-edges = []
-edge_attrs = []
-labels = []
-from collections import defaultdict
-
-# Define a mapping for actions to numerical labels
-action_mapping = {'North': 0, 'South': 1, 'East': 2, 'West': 3}
-
-# Function to process a single file and extract data
-def process_data(data_line):
-
-    # Example line: (0, (8, 2), ['.', '.', '%', '.'], [(4, 12), (4, 13), (16, 11)], ...)
-    elements = data_line  # Convert string to tuple
-    agentIndex, currDronePos, objectsAround, otherAgentPositions, wallCorners, battery, fire, food, score, action, nextPos = elements
-
-    # Convert position to numerical features
-    x_pos, y_pos = currDronePos
-    obj_enc = [1 if (obj == '%' or obj=='G' or obj=='P' or obj=='F') else 0 for obj in objectsAround]  # Example encoding walls (modify as needed)
-
-    # Encode other agents' positions (distance-based encoding)
-    agent_distances = [abs(x_pos - ax) + abs(y_pos - ay) for ax, ay in otherAgentPositions]
-
-    # Encode labels (action)
-    action_label = action_mapping[action]
-
-    # Combine node features
-    node_features = torch.tensor([x_pos, y_pos, *obj_enc, *agent_distances, battery, fire, *food, score], dtype=torch.float)
-
-    return node_features, action_label
-
-from torch_geometric.data import Data
-import glob
-import re
 import ast
 
+def load_txt(file_path):
+        with open(file_path, 'r') as f:
+            allParsed = []
+            for line in f:  # Read line by line
+                parsedList=[]
+                line = line.strip()
+                firstIdx=line.find('(')
+                if line.endswith(")"):  # Check if line starts and ends with ()
+                    line = line[firstIdx+1:-1]  # Remove first '(' and last ')'
+                    data = ast.literal_eval(f"({line})")
+                    # for item in data:
+                    #     parsedList.append(item)
+                    allParsed.append(data)
+            return allParsed
+# Function to process a single file and extract data
+def process_data(data_line):
+
+    # Example line: (0, (8, 2), ['.', '.', '%', '.'], [(4, 12), (4, 13), (16, 11)], ...)
+    elements = data_line  # Convert string to tuple
+    agentIndex, currDronePos, objectsAround, otherAgentPositions, wallCorners, battery, fire, food, score, action, nextPos = elements
+
+    # Convert position to numerical features
+    x_pos, y_pos = currDronePos
+    obj_enc = [1 if obj in {'%', 'G', 'P'} else 0 if obj == 'F' else 0.5 for obj in objectsAround]
+
+    # Encode other agents' positions (distance-based encoding)
+    agent_distances = [abs(x_pos - ax) + abs(y_pos - ay) for ax, ay in otherAgentPositions]
+
+    # Encode labels (action)
+    action_label = action_mapping[action]
+
+    # Combine node features
+    node_features = torch.tensor([x_pos, y_pos, *obj_enc, *agent_distances, battery, fire, *food, score], dtype=torch.float)
+
+    return node_features, action_label
+
+# Define a mapping for actions to numerical labels
+action_mapping = {'North': 0, 'South': 1, 'East': 2, 'West': 3, 'Stop':4}
+
 # Load all files
 data_folder = "/home/salmansaleh/PycharmProjects/GraphNeuralNetwork/logs/"
 # Recursively get all .pkl files in subdirectories
 files = glob.glob(os.path.join(data_folder, "**", "1_*.txt"), recursive=True)
-files = files[:10]
+#files = files[:100]
 print('Total Valid Files-', len(files))
-
-
-def load_txt(file_path):
-    with open(file_path, 'r') as f:
-        allParsed = []
-        for line in f:  # Read line by line
-            parsedList=[]
-            line = line.strip()
-            firstIdx=line.find('(')
-            if line.endswith(")"):  # Check if line starts and ends with ()
-                line = line[firstIdx+1:-1]  # Remove first '(' and last ')'
-                data = ast.literal_eval(f"({line})")
-                allParsed.append(data)
-        return allParsed
 
 # Load all data samples
 all_missions = [load_txt(file) for file in files]
 
 print(f"Loaded {len(all_missions)} samples from multiple folders.")
 print("Example sample:", all_missions[0])  # Check first sample
-
-from torch_geometric.data import Data
 
 all_graphs = []  # Store multiple missions as separate graphs
 
@@ -175,9 +108,6 @@ for mission in all_missions:
 # Print first graph structure
 print(all_graphs[0])
 
-
-import torch
-from torch_geometric.data import Data
 
 # Save graph to file
 torch.save(all_graphs, "graph_dataset.pt")
