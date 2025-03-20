@@ -16,6 +16,9 @@ def load_txt(file_path):
                     data = ast.literal_eval(f"({line})")
                     # for item in data:
                     #     parsedList.append(item)
+                    if len(data)!=11:
+                        raise Exception("Length of data is not 11!")
+
                     allParsed.append(data)
             return allParsed
 # Function to process a single file and extract data
@@ -29,8 +32,17 @@ def process_data(data_line):
     x_pos, y_pos = currDronePos
     obj_enc = [1 if obj in {'%', 'G', 'P'} else 0 if obj == 'F' else 0.5 for obj in objectsAround]
 
-    # Encode other agents' positions (distance-based encoding)
+    max_agents = 4  # Set based on your data distribution
+
+    # Encode agent distances with fixed length
     agent_distances = [abs(x_pos - ax) + abs(y_pos - ay) for ax, ay in otherAgentPositions]
+
+    # Truncate or pad to ensure fixed length
+    if len(agent_distances) > max_agents:
+        agent_distances = agent_distances[:max_agents]  # Truncate if too many
+    else:
+        agent_distances += [0] * (max_agents - len(agent_distances))  # Pad if too few
+
 
     # Encode labels (action)
     action_label = action_mapping[action]
@@ -57,8 +69,10 @@ print(f"Loaded {len(all_missions)} samples from multiple folders.")
 print("Example sample:", all_missions[0])  # Check first sample
 
 all_graphs = []  # Store multiple missions as separate graphs
-
+missionNo=0
 for mission in all_missions:
+    missionNo=missionNo+1
+    print('Processing Mission: ', missionNo)
     nodes = []
     edge_index = []
     obstacle_edges = []
@@ -110,8 +124,8 @@ print(all_graphs[0])
 
 
 # Save graph to file
-torch.save(all_graphs, "graph_dataset.pt")
-
+torch.save(all_graphs, "graphs_dataset.pt")
+print('Missions Saved!')
 # Load graph from file
-loaded_data = torch.load("graph_dataset.pt")
+loaded_data = torch.load("graphs_dataset.pt")
 print(loaded_data)
