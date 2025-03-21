@@ -47,7 +47,7 @@ optimizer = optim.Adam(model.parameters(), lr=0.01)
 loss_fn = torch.nn.CrossEntropyLoss()
 
 # Training loop
-for epoch in range(20):  # Adjust epochs
+for epoch in range(500):  # Adjust epochs
     total_loss = 0
     for data in train_loader:
         optimizer.zero_grad()

@@ -32,7 +32,7 @@ def process_data(data_line):
     x_pos, y_pos = currDronePos
     obj_enc = [1 if obj in {'%', 'G', 'P'} else 0 if obj == 'F' else 0.5 for obj in objectsAround]
 
-    max_agents = 4  # Set based on your data distribution
+    max_agents = 3
 
     # Encode agent distances with fixed length
     agent_distances = [abs(x_pos - ax) + abs(y_pos - ay) for ax, ay in otherAgentPositions]
