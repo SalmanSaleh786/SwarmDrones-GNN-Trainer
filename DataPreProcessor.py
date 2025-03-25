@@ -31,7 +31,7 @@ def load_files_to_dataframe(base_dir):
     df_list = []
     for root, _, files in os.walk(base_dir):
         for file in files:
-            if file.startswith("1_") and file.endswith(".pkl"):
+            if file.startswith("1_") and file.endswith(".txt"):
                 file_path = os.path.join(root, file)
                 try:
                     df = pd.read_csv(file_path)
@@ -49,7 +49,7 @@ def load_files_to_dataframe(base_dir):
 
 # Example usage
 base_directory = "logs"
-#rename_files(base_directory)
+rename_files(base_directory)
 df = load_files_to_dataframe(base_directory)
 
 # Display the loaded DataFrame

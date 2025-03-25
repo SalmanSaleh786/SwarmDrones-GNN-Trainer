@@ -30,8 +30,8 @@ def process_data(data_line):
 
     # Convert position to numerical features
     x_pos, y_pos = currDronePos
-    obj_enc = [1 if obj in {'%', 'G', 'P'} else 0 if obj == 'F' else 0.5 for obj in objectsAround]
-
+    obj_enc = [0 if obj in {'%', 'G', 'P'} else 1 if obj == 'F' else 0.5 for obj in objectsAround]
+    walls_enc=[0 if obj==True else 1 for obj in wallCorners]
     max_agents = 3
 
     # Encode agent distances with fixed length
@@ -46,9 +46,18 @@ def process_data(data_line):
 
     # Encode labels (action)
     action_label = action_mapping[action]
-
+    # agentIndex,
+    # currDronePos,
+    # objectsAroundCurrPos,
+    # otherAgentPositions,
+    # wallCorners,
+    # data.agentStates[agentIndex].getBattery(),
+    # self.isFireHere(currDronePos, data.layout),
+    # self.isFoodNearby(currDronePos, data.layout),
+    # data.score,
+    # action
     # Combine node features
-    node_features = torch.tensor([x_pos, y_pos, *obj_enc, *agent_distances, battery, fire, *food, score], dtype=torch.float)
+    node_features = torch.tensor([x_pos, y_pos, *obj_enc, *agent_distances, *walls_enc, battery, fire, *food, score], dtype=torch.float)
 
     return node_features, action_label
 
@@ -59,6 +68,21 @@ action_mapping = {'North': 0, 'South': 1, 'East': 2, 'West': 3, 'Stop':4}
 data_folder = "/home/salmansaleh/PycharmProjects/GraphNeuralNetwork/logs/"
 # Recursively get all .pkl files in subdirectories
 files = glob.glob(os.path.join(data_folder, "**", "1_*.txt"), recursive=True)
+
+# import re
+# def extract_game_number(file_path):
+#     """Extracts the first integer in the filename as the game number"""
+#     match = re.search(r"/(\d+)_", file_path)  # Looks for the first number before an underscore
+#     return int(match.group(1)) if match else float('inf')  # Default large number if no match
+#
+# # Sort by game number (as an integer)
+# sorted_files = sorted(files, key=extract_game_number)
+#
+# # Print sorted file paths with only the game number for clarity
+# for f in sorted_files:
+#     game_no = extract_game_number(f)
+#     print(f"Game {game_no}: {f}")
+
 #files = files[:100]
 print('Total Valid Files-', len(files))
 
@@ -66,7 +90,7 @@ print('Total Valid Files-', len(files))
 all_missions = [load_txt(file) for file in files]
 
 print(f"Loaded {len(all_missions)} samples from multiple folders.")
-print("Example sample:", all_missions[0])  # Check first sample
+#print("Example sample:", all_missions[0])  # Check first sample
 
 all_graphs = []  # Store multiple missions as separate graphs
 missionNo=0
