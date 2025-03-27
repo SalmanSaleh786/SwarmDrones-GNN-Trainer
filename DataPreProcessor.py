@@ -50,7 +50,8 @@ def load_files_to_dataframe(base_dir):
 # Example usage
 base_directory = "logs"
 rename_files(base_directory)
-df = load_files_to_dataframe(base_directory)
+print('done')
+#df = load_files_to_dataframe(base_directory)
 
 # Display the loaded DataFrame
-print(df)
+#print(df)

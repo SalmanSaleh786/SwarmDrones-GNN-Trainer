@@ -3,153 +3,143 @@ from torch_geometric.data import Data
 import os
 import glob
 import ast
+import re
+from collections import defaultdict
 
+
+# Load text file
 def load_txt(file_path):
-        with open(file_path, 'r') as f:
-            allParsed = []
-            for line in f:  # Read line by line
-                parsedList=[]
-                line = line.strip()
-                firstIdx=line.find('(')
-                if line.endswith(")"):  # Check if line starts and ends with ()
-                    line = line[firstIdx+1:-1]  # Remove first '(' and last ')'
-                    data = ast.literal_eval(f"({line})")
-                    # for item in data:
-                    #     parsedList.append(item)
-                    if len(data)!=11:
-                        raise Exception("Length of data is not 11!")
+    with open(file_path, 'r') as f:
+        allParsed = []
+        for line in f:
+            line = line.strip()
+            firstIdx = line.find('(')
+            if line.endswith(")"):
+                line = line[firstIdx + 1:-1]
+                data = ast.literal_eval(f"({line})")
+                if len(data) != 11:
+                    raise Exception("Length of data is not 11!")
+                allParsed.append(data)
+        return allParsed
 
-                    allParsed.append(data)
-            return allParsed
-# Function to process a single file and extract data
+
 def process_data(data_line):
-
-    # Example line: (0, (8, 2), ['.', '.', '%', '.'], [(4, 12), (4, 13), (16, 11)], ...)
-    elements = data_line  # Convert string to tuple
+    elements = data_line
     agentIndex, currDronePos, objectsAround, otherAgentPositions, wallCorners, battery, fire, food, score, action, nextPos = elements
 
-    # Convert position to numerical features
     x_pos, y_pos = currDronePos
     obj_enc = [0 if obj in {'%', 'G', 'P'} else 1 if obj == 'F' else 0.5 for obj in objectsAround]
-    walls_enc=[0 if obj==True else 1 for obj in wallCorners]
+    walls_enc = [0 if obj else 1 for obj in wallCorners]
+
     max_agents = 3
-
-    # Encode agent distances with fixed length
     agent_distances = [abs(x_pos - ax) + abs(y_pos - ay) for ax, ay in otherAgentPositions]
+    agent_distances += [0] * (max_agents - len(agent_distances))
 
-    # Truncate or pad to ensure fixed length
-    if len(agent_distances) > max_agents:
-        agent_distances = agent_distances[:max_agents]  # Truncate if too many
-    else:
-        agent_distances += [0] * (max_agents - len(agent_distances))  # Pad if too few
+    node_features = torch.tensor([x_pos, y_pos, *obj_enc, *agent_distances, *walls_enc, battery, fire, *food, score],
+                                 dtype=torch.float)
+
+    next_x, next_y = nextPos  # Extract next position
+    next_pos_tensor = torch.tensor([next_x, next_y], dtype=torch.float)  # Convert to tensor
+
+    return node_features, next_pos_tensor
 
 
-    # Encode labels (action)
-    action_label = action_mapping[action]
-    # agentIndex,
-    # currDronePos,
-    # objectsAroundCurrPos,
-    # otherAgentPositions,
-    # wallCorners,
-    # data.agentStates[agentIndex].getBattery(),
-    # self.isFireHere(currDronePos, data.layout),
-    # self.isFoodNearby(currDronePos, data.layout),
-    # data.score,
-    # action
-    # Combine node features
-    node_features = torch.tensor([x_pos, y_pos, *obj_enc, *agent_distances, *walls_enc, battery, fire, *food, score], dtype=torch.float)
+#action_mapping = {'North': 0, 'South': 1, 'East': 2, 'West': 3, 'Stop': 4}
 
-    return node_features, action_label
-
-# Define a mapping for actions to numerical labels
-action_mapping = {'North': 0, 'South': 1, 'East': 2, 'West': 3, 'Stop':4}
-
-# Load all files
 data_folder = "/home/salmansaleh/PycharmProjects/GraphNeuralNetwork/logs/"
-# Recursively get all .pkl files in subdirectories
 files = glob.glob(os.path.join(data_folder, "**", "1_*.txt"), recursive=True)
 
-# import re
-# def extract_game_number(file_path):
-#     """Extracts the first integer in the filename as the game number"""
-#     match = re.search(r"/(\d+)_", file_path)  # Looks for the first number before an underscore
-#     return int(match.group(1)) if match else float('inf')  # Default large number if no match
-#
-# # Sort by game number (as an integer)
-# sorted_files = sorted(files, key=extract_game_number)
-#
-# # Print sorted file paths with only the game number for clarity
-# for f in sorted_files:
-#     game_no = extract_game_number(f)
-#     print(f"Game {game_no}: {f}")
+# Store missions by game
+missionsByGameDict = defaultdict(dict)
+for file in files:
+    match = re.search(r"(\d+)_(Drone\d+)", file.split("/")[-1])
+    if match:
+        game_no = int(match.group(1))
+        drone_id = int(match.group(2)[-1])
 
-#files = files[:100]
-print('Total Valid Files-', len(files))
+        mission_data = load_txt(file)
+        missionsByGameDict[game_no][drone_id] = mission_data
+    else:
+        print('error filename:', file)
 
-# Load all data samples
-all_missions = [load_txt(file) for file in files]
+all_graphs = []  # Store separate graphs per timestep
+previous_positions = {}  # Store node indices from the previous step
 
-print(f"Loaded {len(all_missions)} samples from multiple folders.")
-#print("Example sample:", all_missions[0])  # Check first sample
+for key in missionsByGameDict.keys():
+    missionsOfThisGame = missionsByGameDict[key]  # Get all drone missions for this game
+    print('Processing Game:', key)
 
-all_graphs = []  # Store multiple missions as separate graphs
-missionNo=0
-for mission in all_missions:
-    missionNo=missionNo+1
-    print('Processing Mission: ', missionNo)
-    nodes = []
-    edge_index = []
-    obstacle_edges = []
-    labels = []
+    max_steps = min(len(m) for m in missionsOfThisGame.values())  # Find max available steps
 
-    node_positions = {nd[1]: j for j, nd in enumerate(mission)}  # Fast lookup
+    for step in range(max_steps):  # Iterate over each timestep
+        nodes = []
+        edge_index = []
+        labels = []
+        drone_positions = {}
 
-    for j, missionIndex in enumerate(mission):
-        node_feat, action_label = process_data(missionIndex)
-        node_index = len(nodes)
+        # **Create node position lookup per timestep**
+        node_positions = {}
 
-        # Add node features and labels
-        nodes.append(node_feat)
-        labels.append(action_label)
+        for drone_id, mission in missionsOfThisGame.items():
+            if step >= len(mission):
+                continue
+            pos = mission[step][1]  # Get (x, y) position
+            node_positions[pos] = len(nodes)  # Store node index at this position
 
-        # Connect to previous node (time sequence)
-        if j > 0:
-            edge_index.append([node_index - 1, node_index])
-            edge_index.append([node_index, node_index - 1])  # Bidirectional
+        # Process each drone at this timestep
+        for drone_id, mission in missionsOfThisGame.items():
+            if step >= len(mission):
+                continue
 
-        # Extract position
-        x, y = missionIndex[1]
-        directions = [(0, -1), (-1, 0), (0, 1), (1, 0)]
+            node_feat, next_pos = process_data(mission[step])
+            node_index = len(nodes)  # Assign node index
 
-        for i, obj in enumerate(missionIndex[2]):
-            nx, ny = x + directions[i][0], y + directions[i][1]
+            nodes.append(node_feat)
+            labels.append(next_pos)
+            drone_positions[drone_id] = node_index  # Store node index for edge connections
 
-            neighbor_idx = node_positions.get((nx, ny), None)
+            # **Add edge to previous state (time connection)**
+            if drone_id in previous_positions:
+                edge_index.append([previous_positions[drone_id], node_index])  # Past → Current
+                edge_index.append([node_index, previous_positions[drone_id]])  # Current → Past
 
-            if neighbor_idx is not None:
-                if obj in {'.', '', ' ', 'F'}:  # Normal traversable edges
-                    edge_index.append([node_index, neighbor_idx])
-                else:  # Obstacle edges
-                    obstacle_edges.append([node_index, neighbor_idx])
+            x, y = mission[step][1]
+            #directions = [(-1, 0), (0, -1), (0, 1), (1, 0)]  # Right, Bottom, Top, Left
 
-    # Convert lists to PyTorch tensors
-    edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
-    node_features = torch.stack(nodes)
-    labels = torch.tensor(labels, dtype=torch.long)
+            #if (len(mission)>step+1):
+            #    nextIdx=mission[step+1][1]
+            #    edge_index.append(node_index, nextIdx)
 
-    # Create PyG Data object
-    graph_data = Data(x=node_features, edge_index=edge_index, y=labels)
+            #
+            # for i, obj in enumerate(mission[step][2]):  # Check surrounding cells
+            #     nx, ny = x + directions[i][0], y + directions[i][1]
+            #
+            #     neighbor_idx = node_positions.get((nx, ny))
+            #
+            #     if neighbor_idx is not None:
+            #         if obj in {'.', '', ' ', 'F'}:  # Normal traversable edges
+            #             edge_index.append([node_index, neighbor_idx])
 
-    # Store the graph
-    all_graphs.append(graph_data)
+        # **Store current positions for next timestep**
+        previous_positions = drone_positions.copy()
 
-# Print first graph structure
-print(all_graphs[0])
+        # **Add inter-drone edges at this timestep (optional: check distance)**
+        drone_ids = list(drone_positions.keys())
 
+        for i, drone_a in enumerate(drone_ids):
+            for j, drone_b in enumerate(drone_ids):
+                if i != j:  # Avoid self-loops
+                    edge_index.append([drone_positions[drone_a], drone_positions[drone_b]])
 
-# Save graph to file
+        # Convert to tensors
+        edge_index_tensor = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
+        node_features_tensor = torch.stack(nodes)
+        labels_tensor = torch.tensor(labels, dtype=torch.long)
+
+        # Create PyG Data object for this timestep
+        graph_data = Data(x=node_features_tensor, edge_index=edge_index_tensor, y=labels_tensor)
+        all_graphs.append(graph_data)
+
+print(f"Total graphs created: {len(all_graphs)}")
 torch.save(all_graphs, "graphs_dataset.pt")
-print('Missions Saved!')
-# Load graph from file
-loaded_data = torch.load("graphs_dataset.pt")
-print(loaded_data)
+print("Missions Saved!")
