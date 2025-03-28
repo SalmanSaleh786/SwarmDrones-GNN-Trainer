@@ -9,20 +9,22 @@ data_list = torch.load("graphs_dataset.pt")
 print(f"Loaded {len(data_list)} graphs")
 print(data_list[0])
 
-# Define updated DroneGNN model
 class DroneGNN(torch.nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim):
         super(DroneGNN, self).__init__()
         self.conv1 = GCNConv(input_dim, hidden_dim)
-        self.conv2 = GCNConv(hidden_dim, output_dim)
+        self.conv2 = GCNConv(hidden_dim, hidden_dim)
+        self.conv3 = GCNConv(hidden_dim, output_dim)
 
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
         x = F.relu(self.conv1(x, edge_index))
-        x = self.conv2(x, edge_index)  # No activation for regression
+        x = F.relu(self.conv2(x, edge_index))
+        x = self.conv3(x, edge_index)
         return x
 
 # Model setup
+#print("Target shape:", data.y.shape)
 input_dim = data_list[0].x.shape[1]
 hidden_dim = 128
 output_dim = 2  # Predict next (x, y) coordinates
@@ -33,16 +35,18 @@ batch_size = 32
 train_loader = DataLoader(data_list, batch_size=batch_size, shuffle=True)
 
 # Optimizer & Loss
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.Adam(model.parameters(), lr=0.0001)
 loss_fn = torch.nn.MSELoss()  # Regression loss
 
 # Training loop
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model.train()
-for epoch in range(2000):
+for epoch in range(500):
     total_loss = 0
     for data in train_loader:
         data = data.to(device)
+#        print("X shape:", data.x.shape)
+#        print("Target shape:", data.y.shape)
         optimizer.zero_grad()
         out = model(data)
         loss = loss_fn(out, data.y.float())  # Ensure y is float for MSE

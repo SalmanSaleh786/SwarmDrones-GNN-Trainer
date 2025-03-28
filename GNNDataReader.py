@@ -31,11 +31,11 @@ def process_data(data_line):
     obj_enc = [0 if obj in {'%', 'G', 'P'} else 1 if obj == 'F' else 0.5 for obj in objectsAround]
     walls_enc = [0 if obj else 1 for obj in wallCorners]
 
-    max_agents = 3
-    agent_distances = [abs(x_pos - ax) + abs(y_pos - ay) for ax, ay in otherAgentPositions]
-    agent_distances += [0] * (max_agents - len(agent_distances))
+    #max_agents = 3
+    #agent_distances = [abs(x_pos - ax) + abs(y_pos - ay) for ax, ay in otherAgentPositions]
+    #agent_distances += [0] * (max_agents - len(agent_distances))
 
-    node_features = torch.tensor([x_pos, y_pos, *obj_enc, *agent_distances, *walls_enc, battery, fire, *food, score],
+    node_features = torch.tensor([x_pos, y_pos, *obj_enc, *walls_enc, battery, fire, *food, score],
                                  dtype=torch.float)
 
     next_x, next_y = nextPos  # Extract next position
@@ -51,14 +51,30 @@ files = glob.glob(os.path.join(data_folder, "**", "1_*.txt"), recursive=True)
 
 # Store missions by game
 missionsByGameDict = defaultdict(dict)
+
 for file in files:
     match = re.search(r"(\d+)_(Drone\d+)", file.split("/")[-1])
+
     if match:
         game_no = int(match.group(1))
         drone_id = int(match.group(2)[-1])
 
         mission_data = load_txt(file)
-        missionsByGameDict[game_no][drone_id] = mission_data
+        if game_no in missionsByGameDict and len(missionsByGameDict[game_no]) >= 4:
+            print('duplicate gameNo:', game_no)
+
+            # Delete all files associated with this gameNo
+            for existing_file in files:
+                if existing_file.startswith(f"{game_no}_"):
+                    os.remove(existing_file)
+                    print("Deleted:", existing_file)
+
+            # Remove gameNo from dictionary
+            del missionsByGameDict[game_no]
+            print("Removed entry for gameNo:", game_no)
+
+        else:
+            missionsByGameDict[game_no][drone_id] = mission_data
     else:
         print('error filename:', file)
 
@@ -103,7 +119,7 @@ for key in missionsByGameDict.keys():
                 edge_index.append([previous_positions[drone_id], node_index])  # Past → Current
                 edge_index.append([node_index, previous_positions[drone_id]])  # Current → Past
 
-            x, y = mission[step][1]
+            #x, y = mission[step][1]
             #directions = [(-1, 0), (0, -1), (0, 1), (1, 0)]  # Right, Bottom, Top, Left
 
             #if (len(mission)>step+1):
@@ -111,7 +127,7 @@ for key in missionsByGameDict.keys():
             #    edge_index.append(node_index, nextIdx)
 
             #
-            # for i, obj in enumerate(mission[step][2]):  # Check surrounding cells
+            #for i, obj in enumerate(mission[step][2]):  # Check surrounding cells
             #     nx, ny = x + directions[i][0], y + directions[i][1]
             #
             #     neighbor_idx = node_positions.get((nx, ny))
@@ -134,7 +150,9 @@ for key in missionsByGameDict.keys():
         # Convert to tensors
         edge_index_tensor = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
         node_features_tensor = torch.stack(nodes)
-        labels_tensor = torch.tensor(labels, dtype=torch.long)
+        labels_tensor = torch.tensor([list(label) for label in labels], dtype=torch.float)
+
+#        labels_tensor = torch.tensor(labels, dtype=torch.long)
 
         # Create PyG Data object for this timestep
         graph_data = Data(x=node_features_tensor, edge_index=edge_index_tensor, y=labels_tensor)
