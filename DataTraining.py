@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from torch_geometric.nn import GCNConv
+from torch_geometric.nn import GATConv
 from torch_geometric.loader import DataLoader
 import torch.optim as optim
 
@@ -9,55 +9,70 @@ data_list = torch.load("graphs_dataset.pt")
 print(f"Loaded {len(data_list)} graphs")
 print(data_list[0])
 
-class DroneGNN(torch.nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim):
-        super(DroneGNN, self).__init__()
-        self.conv1 = GCNConv(input_dim, hidden_dim)
-        self.conv2 = GCNConv(hidden_dim, hidden_dim)
-        self.conv3 = GCNConv(hidden_dim, output_dim)
+class DroneGAT(torch.nn.Module):
+    def __init__(self, input_dim, hidden_dim, output_dim, heads=8):
+        super(DroneGAT, self).__init__()
+        self.conv1 = GATConv(input_dim, hidden_dim, heads=heads, concat=True)
+        self.conv2 = GATConv(hidden_dim * heads, hidden_dim, heads=1, concat=False)
+        self.conv3 = GATConv(hidden_dim, hidden_dim, heads=1, concat=False)
+        self.conv4 = GATConv(hidden_dim, output_dim, heads=1, concat=False)  # Only one output layer
 
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
-        x = F.relu(self.conv1(x, edge_index))
-        x = F.relu(self.conv2(x, edge_index))
-        x = self.conv3(x, edge_index)
+        x = F.elu(self.conv1(x, edge_index))
+        x = F.elu(self.conv2(x, edge_index))
+        x = F.elu(self.conv3(x, edge_index))
+        x = self.conv4(x, edge_index)  # Last layer, no activation needed
         return x
 
+
 # Model setup
-#print("Target shape:", data.y.shape)
 input_dim = data_list[0].x.shape[1]
 hidden_dim = 128
 output_dim = 2  # Predict next (x, y) coordinates
-model = DroneGNN(input_dim, hidden_dim, output_dim).to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
+model = DroneGAT(input_dim, hidden_dim, output_dim).to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
 
 # DataLoader
-batch_size = 32
+batch_size = 64
 train_loader = DataLoader(data_list, batch_size=batch_size, shuffle=True)
 
 # Optimizer & Loss
-optimizer = optim.Adam(model.parameters(), lr=0.0001)
+optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 loss_fn = torch.nn.MSELoss()  # Regression loss
 
 # Training loop
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model.train()
-for epoch in range(500):
+import matplotlib.pyplot as plt
+
+losses = []
+
+for epoch in range(70):
     total_loss = 0
     for data in train_loader:
         data = data.to(device)
-#        print("X shape:", data.x.shape)
-#        print("Target shape:", data.y.shape)
         optimizer.zero_grad()
         out = model(data)
-        loss = loss_fn(out, data.y.float())  # Ensure y is float for MSE
+        loss = loss_fn(out, data.y.float())
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
-    print(f"Epoch {epoch+1}, Loss: {total_loss:.4f}")
+
+    losses.append(total_loss)
+    #if (epoch + 1) % 10 == 0:  # Print loss every 10 epochs
+    print(f"Epoch {epoch + 1}, Loss: {total_loss:.4f}")
 
 # Save model
-torch.save(model.state_dict(), "gnn_model.pth")
+torch.save(model.state_dict(), "gat_model.pth")
 print("Training complete and model saved!")
+
+plt.plot(losses)
+plt.xlabel("Epochs")
+plt.ylabel("Loss")
+plt.title("Training Loss Curve")
+plt.show()
+
+
 
 # Prediction function
 def predict_next_position(test_data):

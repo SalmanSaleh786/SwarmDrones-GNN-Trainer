@@ -25,21 +25,27 @@ def load_txt(file_path):
 
 def process_data(data_line):
     elements = data_line
-    agentIndex, currDronePos, objectsAround, otherAgentPositions, wallCorners, battery, fire, food, score, action, nextPos = elements
+    agentIndex, currDronePos, objectsAround, otherAgentPositions, wallCorners, battery, fire, foodCorners, score, action, nextPos = elements
 
     x_pos, y_pos = currDronePos
     obj_enc = [0 if obj in {'%', 'G', 'P'} else 1 if obj == 'F' else 0.5 for obj in objectsAround]
     walls_enc = [0 if obj else 1 for obj in wallCorners]
-
+    food_enc=[1 if obj else 0 for obj in foodCorners]
+    normalized_battery = float(battery) / 100.0
+    normalized_score=float(score)/10000
+    normalized_x_pos=float(x_pos)/25
+    normalized_y_pos=float(y_pos)/25
     #max_agents = 3
     #agent_distances = [abs(x_pos - ax) + abs(y_pos - ay) for ax, ay in otherAgentPositions]
     #agent_distances += [0] * (max_agents - len(agent_distances))
 
-    node_features = torch.tensor([x_pos, y_pos, *obj_enc, *walls_enc, battery, fire, *food, score],
+    node_features = torch.tensor([normalized_x_pos, normalized_y_pos, *obj_enc, *walls_enc, *food_enc, normalized_battery, normalized_score],
                                  dtype=torch.float)
 
     next_x, next_y = nextPos  # Extract next position
-    next_pos_tensor = torch.tensor([next_x, next_y], dtype=torch.float)  # Convert to tensor
+    normalized_next_x=float(next_x)/25
+    normalized_next_y=float(next_y)/25
+    next_pos_tensor = torch.tensor([normalized_next_x, normalized_next_y], dtype=torch.float)  # Convert to tensor
 
     return node_features, next_pos_tensor
 
@@ -58,7 +64,6 @@ for file in files:
     if match:
         game_no = int(match.group(1))
         drone_id = int(match.group(2)[-1])
-
         mission_data = load_txt(file)
         if game_no in missionsByGameDict and len(missionsByGameDict[game_no]) >= 4:
             print('duplicate gameNo:', game_no)
@@ -79,13 +84,13 @@ for file in files:
         print('error filename:', file)
 
 all_graphs = []  # Store separate graphs per timestep
-previous_positions = {}  # Store node indices from the previous step
 
 for key in missionsByGameDict.keys():
     missionsOfThisGame = missionsByGameDict[key]  # Get all drone missions for this game
     print('Processing Game:', key)
 
     max_steps = min(len(m) for m in missionsOfThisGame.values())  # Find max available steps
+    previous_positions = {}  # Store node indices from the previous step
 
     for step in range(max_steps):  # Iterate over each timestep
         nodes = []
@@ -139,13 +144,21 @@ for key in missionsByGameDict.keys():
         # **Store current positions for next timestep**
         previous_positions = drone_positions.copy()
 
-        # **Add inter-drone edges at this timestep (optional: check distance)**
+        max_distance = 2  # Maximum allowed Manhattan distance
+
         drone_ids = list(drone_positions.keys())
 
         for i, drone_a in enumerate(drone_ids):
             for j, drone_b in enumerate(drone_ids):
                 if i != j:  # Avoid self-loops
-                    edge_index.append([drone_positions[drone_a], drone_positions[drone_b]])
+                    pos_a = mission[step][1]  # (x, y) of drone_a
+                    pos_b = missionsOfThisGame[drone_b][step][1]  # (x, y) of drone_b
+
+                    distance = abs(pos_a[0] - pos_b[0]) + abs(pos_a[1] - pos_b[1])  # Manhattan distance
+
+                    if distance <= max_distance:  # Only connect if within range
+                        edge_index.append([drone_positions[drone_a], drone_positions[drone_b]])
+                        edge_index.append([drone_positions[drone_b], drone_positions[drone_a]])  # Bidirectional
 
         # Convert to tensors
         edge_index_tensor = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
