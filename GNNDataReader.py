@@ -53,7 +53,8 @@ def process_data(data_line):
 #action_mapping = {'North': 0, 'South': 1, 'East': 2, 'West': 3, 'Stop': 4}
 
 data_folder = "/home/salmansaleh/PycharmProjects/GraphNeuralNetwork/logs/"
-files = glob.glob(os.path.join(data_folder, "**", "1_*.txt"), recursive=True)
+#files = glob.glob(os.path.join(data_folder, "**", "1_*.txt"), recursive=True)
+files = glob.glob(os.path.join(data_folder, "**", "*.txt"), recursive=True)
 
 # Store missions by game
 missionsByGameDict = defaultdict(dict)
@@ -172,5 +173,5 @@ for key in missionsByGameDict.keys():
         all_graphs.append(graph_data)
 
 print(f"Total graphs created: {len(all_graphs)}")
-torch.save(all_graphs, "graphs_dataset.pt")
+torch.save(all_graphs, "graphs_dataset_testing.pt")
 print("Missions Saved!")
