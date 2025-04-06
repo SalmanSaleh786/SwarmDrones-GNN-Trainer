@@ -35,9 +35,6 @@ def process_data(data_line):
     normalized_score=float(score)/10000
     normalized_x_pos=float(x_pos)/25
     normalized_y_pos=float(y_pos)/25
-    #max_agents = 3
-    #agent_distances = [abs(x_pos - ax) + abs(y_pos - ay) for ax, ay in otherAgentPositions]
-    #agent_distances += [0] * (max_agents - len(agent_distances))
 
     node_features = torch.tensor([normalized_x_pos, normalized_y_pos, *obj_enc, *walls_enc, *food_enc, normalized_battery, normalized_score],
                                  dtype=torch.float)
