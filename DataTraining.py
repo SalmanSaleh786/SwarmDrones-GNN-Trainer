@@ -5,8 +5,6 @@ from torch_geometric.loader import DataLoader
 import torch.optim as optim
 import matplotlib.pyplot as plt
 
-
-
 class DroneGNN(torch.nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim):
         super(DroneGNN, self).__init__()
@@ -29,7 +27,6 @@ def predict_next_position(test_data):
         out = model(test_data.to(device))
     return out.cpu().numpy()
 if __name__ == "__main__":
-
     # Load dataset
     data_list = torch.load("graphs_dataset.pt")
     print(f"Loaded {len(data_list)} graphs")

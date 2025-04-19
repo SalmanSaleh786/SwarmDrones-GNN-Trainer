@@ -2,6 +2,18 @@ import torch
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 from torch_geometric.data import Data
+from multiprocessing.connection import Listener
+import torch
+import GNNDataReader
+
+
+class Directions:
+    NORTH = 'North'
+    SOUTH = 'South'
+    EAST = 'East'
+    WEST = 'West'
+    STOP = 'Stop'
+
 
 class DroneGNN(torch.nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim):
@@ -18,8 +30,32 @@ class DroneGNN(torch.nn.Module):
         x = F.relu(self.conv3(x, edge_index))
         x = self.conv4(x, edge_index)
         return x
-# === Inference server loop ===
-def model_server(conn):
+
+
+import pickle
+import struct
+
+
+def getDirection(agent, next):
+    if agent[1] < next[1]:
+        return Directions.NORTH
+    if agent[1] > next[1]:
+        return Directions.SOUTH
+    if agent[0] < next[0]:
+        return Directions.EAST
+    if agent[0] > next[0]:
+        return Directions.WEST
+    return Directions.STOP
+
+
+def model_server():
+    previous_positions_dict = \
+        {
+            0: [],
+            1: [],
+            2: [],
+            3: []
+        }
     print('Starting model server')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     input_dim = 16
@@ -30,10 +66,13 @@ def model_server(conn):
     model.load_state_dict(torch.load("gat_model_0.88.pth", map_location=device))
     model.eval()
 
-    print("[Model] Server ready!")
+    address = ('localhost', 6000)  # You can use a port
+    listener = Listener(address, authkey=b'password')
+    print("[Model] Waiting for connection...")
+    conn = listener.accept()
+    print("[Model] Connected to", listener.last_accepted)
     while True:
         data = conn.recv()
-
         if isinstance(data, str):
             if data == "close":
                 print("[Model] Server closing.")
@@ -41,37 +80,46 @@ def model_server(conn):
             else:
                 print("[Model] Got unexpected string input:", data)
                 continue
-
         try:
-            graph_data = data.to(device)  # move to CPU or GPU
-            output = model(graph_data)
-            conn.send(output)
+            agentIndex    = data[0]
+            historyDrone1 = data[1]
+            historyDrone2 = data[2]
+            historyDrone3 = data[3]
+            historyDrone4 = data[4]
+
+            if   agentIndex == 0 and len(historyDrone1)>0:
+                previous_positions_dict[agentIndex].append(historyDrone1[0][0])
+            elif agentIndex == 1 and len(historyDrone2)>0:
+                previous_positions_dict[agentIndex].append(historyDrone2[0][0])
+            elif agentIndex == 2 and len(historyDrone3)>0:
+                previous_positions_dict[agentIndex].append(historyDrone3[0][0])
+            elif agentIndex == 3 and len(historyDrone4)>0:
+                previous_positions_dict[agentIndex].append(historyDrone4[0][0])
+
+            if historyDrone1 == [] or historyDrone2 == [] or historyDrone3 == [] or historyDrone4 == []:
+                output = Directions.STOP
+            else:
+                data = GNNDataReader.convert_To_Graph(data, previous_positions_dict[agentIndex])
+                graph_data = data.to(device)  # move to CPU or GPU
+                output = model(graph_data)
+                # Get the predicted normalized (x, y) for the agent
+                predicted_next_pos = output[agentIndex]
+                # Denormalize if needed (if getDirection uses actual grid coordinates)
+                predicted_next_pos = predicted_next_pos * 25  # since your input normalized by dividing by 25
+                # Convert to tuple of ints
+                predicted_next_pos = tuple(predicted_next_pos.round().int().tolist())
+                # Get current position from the latest history
+                current_pos = data[1 + agentIndex][0][1]  # e.g., historyDroneX[0][1]
+                # Now get the direction
+                output = getDirection(current_pos, predicted_next_pos)
+
+            bytes_to_send = pickle.dumps(output, protocol=2)
+            conn.send_bytes(bytes_to_send)
         except Exception as e:
             print("[Model] Error during prediction:", e)
             conn.send("error")
 
-from multiprocessing import Process, Pipe
-# Create a bidirectional pipe
-parent_conn, child_conn = Pipe()
 
-# Start the model server in a new process
-p = Process(target=model_server, args=(child_conn,))
-p.start()
-
-# === Now communicate with it ===
-# Prepare some dummy input graph
-graph_input = {
-    "x": [[...]],  # List of node features
-    "edge_index": [[0, 1], [1, 0]]
-}
-
-# Send input to model server
-parent_conn.send(graph_input)
-
-# Receive output
-output = parent_conn.recv()
-print("Received prediction:", output)
-
-# To stop the server
-parent_conn.send("close")
-p.join()
+import pydevd_pycharm
+pydevd_pycharm.settrace('localhost', port=12345, stdoutToServer=True, stderrToServer=True, suspend=False)
+model_server()
