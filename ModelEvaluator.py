@@ -56,6 +56,7 @@ def model_server():
             2: [],
             3: []
         }
+
     print('Starting model server')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     input_dim = 16
@@ -86,7 +87,7 @@ def model_server():
             historyDrone2 = data[2]
             historyDrone3 = data[3]
             historyDrone4 = data[4]
-
+            output_direction = Directions.STOP
             if   agentIndex == 0 and len(historyDrone1)>0:
                 previous_positions_dict[agentIndex].append(historyDrone1[0][0])
             elif agentIndex == 1 and len(historyDrone2)>0:
@@ -97,28 +98,27 @@ def model_server():
                 previous_positions_dict[agentIndex].append(historyDrone4[0][0])
 
             if historyDrone1 == [] or historyDrone2 == [] or historyDrone3 == [] or historyDrone4 == []:
-                output = Directions.STOP
+                output_direction = Directions.STOP
             else:
-                data = GNNDataReader.convert_To_Graph(data, previous_positions_dict[agentIndex])
-                graph_data = data.to(device)  # move to CPU or GPU
-                output = model(graph_data)
-                # Get the predicted normalized (x, y) for the agent
-                predicted_next_pos = output[agentIndex]
-                # Denormalize if needed (if getDirection uses actual grid coordinates)
-                predicted_next_pos = predicted_next_pos * 25  # since your input normalized by dividing by 25
-                # Convert to tuple of ints
-                predicted_next_pos = tuple(predicted_next_pos.round().int().tolist())
-                # Get current position from the latest history
-                current_pos = data[1 + agentIndex][0][1]  # e.g., historyDroneX[0][1]
-                # Now get the direction
-                output = getDirection(current_pos, predicted_next_pos)
+                dataGraph, agent_to_node = GNNDataReader.convert_To_Graph(data, previous_positions_dict)
+                dataGraph = dataGraph.to(device)
+                output = model(dataGraph)
+                if agentIndex not in agent_to_node:
+                    print(f"[Model] Agent index {agentIndex} not found in the graph nodes!")
+                    output_direction = Directions.STOP
+                else:
+                    node_index = agent_to_node[agentIndex]
+                    predicted_next_pos = output[node_index]
+                    predicted_next_pos = predicted_next_pos * 25
+                    predicted_next_pos = tuple(predicted_next_pos.round().int().tolist())
+                    current_pos =  data[1 + agentIndex][0][1]  # Adjust this based on actual position access
+                    output_direction = getDirection(current_pos, predicted_next_pos)
 
-            bytes_to_send = pickle.dumps(output, protocol=2)
+            bytes_to_send = pickle.dumps(output_direction, protocol=2)
             conn.send_bytes(bytes_to_send)
         except Exception as e:
             print("[Model] Error during prediction:", e)
             conn.send("error")
-
 
 import pydevd_pycharm
 pydevd_pycharm.settrace('localhost', port=12345, stdoutToServer=True, stderrToServer=True, suspend=False)
