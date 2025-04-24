@@ -4,21 +4,32 @@ from torch_geometric.nn import GCNConv  # ✅ Correct import
 from torch_geometric.loader import DataLoader
 import torch.optim as optim
 import matplotlib.pyplot as plt
+from torch_geometric.nn import GCNConv, BatchNorm
 
 class DroneGNN(torch.nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim):
+    def __init__(self, input_dim, hidden_dim, output_dim, dropout_rate=0.01):
         super(DroneGNN, self).__init__()
         self.conv1 = GCNConv(input_dim, hidden_dim)
+        self.bn1 = BatchNorm(hidden_dim)
         self.conv2 = GCNConv(hidden_dim, hidden_dim)
-        self.conv3 = GCNConv(hidden_dim, hidden_dim)  # Added extra layer
-        self.conv4 = GCNConv(hidden_dim, output_dim)
-
+        self.bn2 = BatchNorm(hidden_dim)
+        self.conv3 = GCNConv(hidden_dim, hidden_dim)
+        self.bn3 = BatchNorm(hidden_dim)
+        self.conv4 = GCNConv(hidden_dim, hidden_dim)
+        self.bn4 = BatchNorm(hidden_dim)
+        self.conv5 = GCNConv(hidden_dim, hidden_dim)
+        self.bn5 = BatchNorm(hidden_dim)
+        self.conv6 = GCNConv(hidden_dim, output_dim)
+        self.dropout = torch.nn.Dropout(dropout_rate)
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
-        x = F.relu(self.conv1(x, edge_index))
-        x = F.relu(self.conv2(x, edge_index))
-        x = F.relu(self.conv3(x, edge_index))
-        x = self.conv4(x, edge_index)
+        x = F.relu(self.bn1(self.conv1(x, edge_index)))
+        x = F.relu(self.bn2(self.conv2(x, edge_index)))
+        x = self.dropout(x)
+        x = F.relu(self.bn3(self.conv3(x, edge_index)))
+        x = F.relu(self.bn4(self.conv4(x, edge_index)))
+        x = F.relu(self.bn5(self.conv5(x, edge_index)))
+        x = self.conv6(x, edge_index)
         return x
  # Prediction function
 def predict_next_position(test_data):
@@ -39,7 +50,7 @@ if __name__ == "__main__":
     model = DroneGNN(input_dim, hidden_dim, output_dim).to(device)
 
     # DataLoader
-    batch_size = 64
+    batch_size = 32
     train_loader = DataLoader(data_list, batch_size=batch_size, shuffle=True)
 
     # Optimizer & Loss

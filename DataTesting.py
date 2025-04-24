@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from DataTraining import DroneGNN
 
 # Load test dataset
-test_data_list = torch.load("graphs_dataset_testing.pt")  # Load your test data
+test_data_list = torch.load("graphs_dataset.pt")  # Load your test data
 
 # Load the trained model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
