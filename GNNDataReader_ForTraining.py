@@ -84,8 +84,10 @@ for file in files:
         print('error filename:', file)
 
 all_graphs = []  # Store separate graphs per timestep
-
+gameIdx=0
 for key in missionsByGameDict.keys():
+    gameIdx=gameIdx+1
+    print(gameIdx)
     missionsOfThisGame = missionsByGameDict[key]  # Get all drone missions for this game
     print('Processing Game:', key)
 
