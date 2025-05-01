@@ -26,7 +26,6 @@ def load_txt(file_path):
 def process_data(data_line):
     elements = data_line
     agentIndex, currDronePos, objectsAround, otherAgentPositions, wallCorners, battery, fire, foodCorners, score, action, nextPos = elements
-
     x_pos, y_pos = currDronePos
     obj_enc = [0 if obj in {'%', 'G', 'P'} else 1 if obj == 'F' else 0.5 for obj in objectsAround]
     walls_enc = [0 if obj else 1 for obj in wallCorners]

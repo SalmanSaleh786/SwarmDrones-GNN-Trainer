@@ -18,12 +18,7 @@ def process_data(data_line):
     node_features = torch.tensor([normalized_x_pos, normalized_y_pos, *obj_enc, *walls_enc, *food_enc, normalized_battery, normalized_score],
                                  dtype=torch.float)
 
-    #next_x, next_y = nextPos
-    #normalized_next_x = float(next_x) / 25
-    #normalized_next_y = float(next_y) / 25
-    #next_pos_tensor = torch.tensor([normalized_next_x, normalized_next_y], dtype=torch.float)
-
-    return node_features#, next_pos_tensor
+    return node_features
 
 def convert_To_Graph(data, previous_positions):
     # agentIndex = data[0]
