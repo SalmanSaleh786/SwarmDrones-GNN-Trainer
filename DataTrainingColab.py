@@ -7,7 +7,7 @@ from torch.nn import Linear
 
 class PositionOnlyEdgeConv(MessagePassing):
     def __init__(self, in_channels, out_channels, pos_dim=2):
-        super(PositionOnlyEdgeConv, self).__init__(aggr='mean')  # mean aggregation
+        super(PositionOnlyEdgeConv, self).__init__(aggr='mean')
 
         # Linear layer will take full node features + aggregated position info from neighbors
         self.linear = Linear(in_channels + pos_dim, out_channels)
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     # Dimensions
     input_dim = data_list[0].x.shape[1]   # Full feature vector length
     print('Input DIM:'+str(input_dim))
-    hidden_dim = 128
+    hidden_dim = 154
     output_dim = 2                        # Predict next (x, y)
     pos_dim = 2                           # Number of position features at the beginning of x
 
