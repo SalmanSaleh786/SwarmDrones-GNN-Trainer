@@ -4,6 +4,8 @@ from torch_geometric.nn import GCNConv
 from torch_geometric.data import Data
 from multiprocessing.connection import Listener
 import torch
+
+import DataTrainingColab
 import GNNDataReader
 
 
@@ -15,21 +17,7 @@ class Directions:
     STOP = 'Stop'
 
 
-class DroneGNN(torch.nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim):
-        super(DroneGNN, self).__init__()
-        self.conv1 = GCNConv(input_dim, hidden_dim)
-        self.conv2 = GCNConv(hidden_dim, hidden_dim)
-        self.conv3 = GCNConv(hidden_dim, hidden_dim)  # Added extra layer
-        self.conv4 = GCNConv(hidden_dim, output_dim)
 
-    def forward(self, data):
-        x, edge_index = data.x, data.edge_index
-        x = F.relu(self.conv1(x, edge_index))
-        x = F.relu(self.conv2(x, edge_index))
-        x = F.relu(self.conv3(x, edge_index))
-        x = self.conv4(x, edge_index)
-        return x
 
 
 import pickle
@@ -60,11 +48,12 @@ def model_server():
     print('Starting model server')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     input_dim = 16
-    hidden_dim = 128
+    hidden_dim = 154
     output_dim = 2
+    pos_dim=2
 
-    model = DroneGNN(input_dim, hidden_dim, output_dim).to(device)
-    model.load_state_dict(torch.load("gat_model_0.88.pth", map_location=device))
+    model = DataTrainingColab.DroneGNN(input_dim, hidden_dim, output_dim, pos_dim=pos_dim).to(device)
+    model.load_state_dict(torch.load("gat_model.pth", map_location=device))
     model.eval()
 
     address = ('localhost', 6000)  # You can use a port
