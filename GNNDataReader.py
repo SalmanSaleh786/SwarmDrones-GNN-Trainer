@@ -21,11 +21,10 @@ def process_data(data_line):
     return node_features
 
 def convert_To_Graph(data, previous_positions):
-    # agentIndex = data[0]
+
     edge_index = []
     node_features = []
     agent_to_node = {}
-
     missions = {
         0: data[1],
         1: data[2],
@@ -36,10 +35,10 @@ def convert_To_Graph(data, previous_positions):
     node_counter = 0
     for i in range(4):
         if len(missions[i]) > 0:
-            node_feat = process_data(missions[i][0])
+            node_feat = process_data(missions[i][len(missions[i])-1])
             node_features.append(node_feat)
             agent_to_node[i] = node_counter
-            drone_positions[i] = missions[i][0][1]  # save (x, y)
+            drone_positions[i] = missions[i][len(missions[i])-1][1]  # save (x, y)
         node_counter += 1
 
     # Time edges

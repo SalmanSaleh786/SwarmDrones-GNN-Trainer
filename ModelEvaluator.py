@@ -12,17 +12,13 @@ import GNNDataReader
 class Directions:
     NORTH = 'North'
     SOUTH = 'South'
-    EAST = 'East'
-    WEST = 'West'
-    STOP = 'Stop'
-
-
-
+    EAST  = 'East'
+    WEST  = 'West'
+    STOP  = 'Stop'
 
 
 import pickle
 import struct
-
 
 def getDirection(agent, next):
     if agent[1] < next[1]:
@@ -78,13 +74,13 @@ def model_server():
             historyDrone4 = data[4]
             output_direction = Directions.STOP
             if   agentIndex == 0 and len(historyDrone1)>0:
-                previous_positions_dict[agentIndex].append(historyDrone1[0][0])
+                previous_positions_dict[agentIndex].append(historyDrone1[len(historyDrone1)-1][0])
             elif agentIndex == 1 and len(historyDrone2)>0:
-                previous_positions_dict[agentIndex].append(historyDrone2[0][0])
+                previous_positions_dict[agentIndex].append(historyDrone2[len(historyDrone2)-1][0])
             elif agentIndex == 2 and len(historyDrone3)>0:
-                previous_positions_dict[agentIndex].append(historyDrone3[0][0])
+                previous_positions_dict[agentIndex].append(historyDrone3[len(historyDrone3)-1][0])
             elif agentIndex == 3 and len(historyDrone4)>0:
-                previous_positions_dict[agentIndex].append(historyDrone4[0][0])
+                previous_positions_dict[agentIndex].append(historyDrone4[len(historyDrone4)-1][0])
 
             if historyDrone1 == [] or historyDrone2 == [] or historyDrone3 == [] or historyDrone4 == []:
                 output_direction = Directions.STOP
