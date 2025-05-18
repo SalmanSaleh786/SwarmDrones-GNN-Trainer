@@ -83,7 +83,7 @@ def predict_next_position(graph):
 
 if __name__ == "__main__":
     # Load dataset
-    data_list = torch.load("graphs_dataset.pt")
+    data_list = torch.load("graphs_dataset_for loss 0.99.pt")
     print(f"Loaded {len(data_list)} graphs")
 
     # Model setup

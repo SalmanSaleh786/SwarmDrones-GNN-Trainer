@@ -39,7 +39,7 @@ def predict_next_position(test_data):
     return out.cpu().numpy()
 if __name__ == "__main__":
     # Load dataset
-    data_list = torch.load("graphs_dataset.pt")
+    data_list = torch.load("graphs_dataset_for loss 0.99.pt")
     print(f"Loaded {len(data_list)} graphs")
 
     # Model setup
@@ -85,6 +85,7 @@ if __name__ == "__main__":
     plt.ylabel("Loss")
     plt.title("Training Loss Curve")
     plt.show()
+
 
 
 

@@ -33,6 +33,9 @@ def getDirection(agent, next):
 
 
 def model_server():
+    import matplotlib.pyplot as plt
+    execution_times = []
+    cntr=0
     previous_positions_dict = \
         {
             0: [],
@@ -87,7 +90,22 @@ def model_server():
             else:
                 dataGraph, agent_to_node = GNNDataReader.convert_To_Graph(data, previous_positions_dict)
                 dataGraph = dataGraph.to(device)
+                import time
+                start = time.time()
+                cntr=cntr+1
                 output = model(dataGraph)
+                elapsed = time.time() - start
+                print('time' + str(elapsed))
+                execution_times.append(elapsed)
+                # if cntr>70:
+                #     # Plotting the execution time
+                #     plt.figure(figsize=(10, 5))
+                #     plt.plot(execution_times, marker='o', linestyle='-', color='b')
+                #     plt.xlabel('Step')
+                #     plt.ylabel('Execution Time (seconds)')
+                #     plt.title('getAction Execution Time per Step')
+                #     plt.grid(True)
+                #     plt.show()
                 if agentIndex not in agent_to_node:
                     print(f"[Model] Agent index {agentIndex} not found in the graph nodes!")
                     output_direction = Directions.STOP
