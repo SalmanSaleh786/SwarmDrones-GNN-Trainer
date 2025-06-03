@@ -122,18 +122,19 @@ if __name__ == "__main__":
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-        losses.append(total_loss)
-        print(f"Epoch {epoch + 1}, Loss: {total_loss:.4f}")
+        avg_loss = total_loss / batch_size
+        losses.append(avg_loss)
+        print(f"Epoch {epoch + 1}, Loss: {avg_loss:.4f}")
 
     # Save model
-    torch.save(model.state_dict(), "gat_model.pth")
+    torch.save(model.state_dict(), "gat_model_forplot_0.0153.pth")
     print("Training complete and model saved!")
 
     # Plot loss
     plt.plot(losses)
     plt.xlabel("Epochs")
     plt.ylabel("Loss")
-    plt.title("Training Loss Curve")
+    plt.title("Training Avg Loss Curve")
     plt.show()
 
     # Example prediction
